@@ -1,0 +1,72 @@
+cmake_minimum_required(VERSION 3.24)
+
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file")
+endif()
+
+project(VulkanDay1)
+
+# Set C++ Standard
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Package Dependencies
+find_package(SDL3 CONFIG REQUIRED)
+find_package(SDL3_ttf CONFIG REQUIRED)
+find_package(SDL3_image CONFIG REQUIRED)
+find_package(flecs CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
+find_package(box2d CONFIG REQUIRED)
+find_package(fmt CONFIG REQUIRED)
+find_package(efsw CONFIG REQUIRED)
+
+# Include Directories
+include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${IMGUI_BACKENDS_DIR})
+
+# Source Files
+file(GLOB_RECURSE USER_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/src/*.cpp"
+)
+
+# Executable Target
+add_executable(${PROJECT_NAME}
+    ${CMAKE_SOURCE_DIR}/main.cpp
+    ${USER_SOURCES}
+)
+
+# Compiler Options
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /std:c++latest)
+endif()
+
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    SDL3::SDL3
+    SDL3_ttf::SDL3_ttf
+    SDL3_image::SDL3_image
+    imgui::imgui
+    flecs::flecs
+    box2d::box2d
+    fmt::fmt
+)
+
+# On Windows, explicitly link opengl32
+if(MSVC)
+    target_link_libraries(${PROJECT_NAME} PRIVATE)
+endif()
+
+# copy assets folder to build directory after build
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/assets
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets
+    COMMENT "Copying assets folder to build directory"
+)
+
+# copy shaders folder to build directory after build
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders
+    COMMENT "Copying shaders folder to build directory"
+)
