@@ -4,6 +4,7 @@
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_video.h>
+#include <SDL3_shadercross/SDL_shadercross.h>
 #include <fmt/core.h>
 #include <fmt/format.h>
 
@@ -37,12 +38,9 @@ int main()
         1280, 720, /* width, height */
         SDL_WINDOW_RESIZABLE);
 
-    SDL_GPUDevice *device = SDL_CreateGPUDevice(
-        SDL_GPU_SHADERFORMAT_SPIRV |    /* Vulkan/cross-platform */
-            SDL_GPU_SHADERFORMAT_DXIL | /* D3D12 */
-            SDL_GPU_SHADERFORMAT_MSL,   /* Metal */
-        true,                           /* debug_mode */
-        "vulkan"                        /* auto-select backend */
+    SDL_GPUDevice *device = SDL_CreateGPUDevice(SDL_ShaderCross_GetSPIRVShaderFormats(),
+                                                true, /* debug_mode */
+                                                NULL  /* auto-select backend */
     );
 
     if (!device)
@@ -66,6 +64,23 @@ int main()
     {
         SDL_Log(fmt::format("Render Driver {}: {}", i, SDL_GetRenderDriver(i)).c_str());
     }
+
+    SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(device);
+    if (formats & SDL_GPU_SHADERFORMAT_SPIRV)
+        SDL_Log("Supports SPIR-V");
+
+    if (formats & SDL_GPU_SHADERFORMAT_DXIL)
+        SDL_Log("Supports DXIL");
+
+    if (formats & SDL_GPU_SHADERFORMAT_DXBC)
+        SDL_Log("Supports DXBC");
+
+    if (formats & SDL_GPU_SHADERFORMAT_MSL)
+        SDL_Log("Supports MSL");
+
+    if (formats & SDL_GPU_SHADERFORMAT_METALLIB)
+        SDL_Log("Supports MetalLib");
+
 #pragma endregion
 
 #pragma region triangle
@@ -121,17 +136,20 @@ int main()
     void *vertexCode = SDL_LoadFile("shaders/vertex.spv", &vertexCodeSize);
 
     // create the vertex shader
-    SDL_GPUShaderCreateInfo vertexInfo{};
-    vertexInfo.code = (Uint8 *)vertexCode; // convert to an array of bytes
-    vertexInfo.code_size = vertexCodeSize;
+    SDL_ShaderCross_SPIRV_Info vertexInfo{};
+    vertexInfo.bytecode = (Uint8 *)vertexCode;
+    vertexInfo.bytecode_size = vertexCodeSize;
     vertexInfo.entrypoint = "main";
-    vertexInfo.format = SDL_GPU_SHADERFORMAT_SPIRV; // loading .spv shaders
-    vertexInfo.stage = SDL_GPU_SHADERSTAGE_VERTEX;  // vertex shader
-    vertexInfo.num_samplers = 0;
-    vertexInfo.num_storage_buffers = 0;
-    vertexInfo.num_storage_textures = 0;
-    vertexInfo.num_uniform_buffers = 0;
-    SDL_GPUShader *vertexShader = SDL_CreateGPUShader(device, &vertexInfo);
+    vertexInfo.shader_stage = SDL_SHADERCROSS_SHADERSTAGE_VERTEX;
+
+    // figure out shader metadata
+    const SDL_ShaderCross_GraphicsShaderMetadata *vertexMetadata = SDL_ShaderCross_ReflectGraphicsSPIRV((Uint8 *)vertexCode, vertexCodeSize, 0);
+
+    // cross compile to the appropriate shaderformat and create a shader object
+    SDL_GPUShader *vertexShader = SDL_ShaderCross_CompileGraphicsShaderFromSPIRV(device, &vertexInfo, &vertexMetadata->resource_info, 0);
+
+    // free the metadata
+    SDL_free((void *)vertexMetadata);
 
     // free the file
     SDL_free(vertexCode);
@@ -141,18 +159,17 @@ int main()
     void *fragmentCode = SDL_LoadFile("shaders/fragment.spv", &fragmentCodeSize);
 
     // create the fragment shader
-    SDL_GPUShaderCreateInfo fragmentInfo{};
-    fragmentInfo.code = (Uint8 *)fragmentCode;
-    fragmentInfo.code_size = fragmentCodeSize;
+    SDL_ShaderCross_SPIRV_Info fragmentInfo{};
+    fragmentInfo.bytecode = (Uint8 *)fragmentCode;
+    fragmentInfo.bytecode_size = fragmentCodeSize;
     fragmentInfo.entrypoint = "main";
-    fragmentInfo.format = SDL_GPU_SHADERFORMAT_SPIRV;
-    fragmentInfo.stage = SDL_GPU_SHADERSTAGE_FRAGMENT; // fragment shader
-    fragmentInfo.num_samplers = 0;
-    fragmentInfo.num_storage_buffers = 0;
-    fragmentInfo.num_storage_textures = 0;
-    fragmentInfo.num_uniform_buffers = 0;
+    fragmentInfo.shader_stage = SDL_SHADERCROSS_SHADERSTAGE_FRAGMENT;
 
-    SDL_GPUShader *fragmentShader = SDL_CreateGPUShader(device, &fragmentInfo);
+    SDL_ShaderCross_GraphicsShaderMetadata *fragmentMetadata = SDL_ShaderCross_ReflectGraphicsSPIRV((Uint8 *)fragmentCode, fragmentCodeSize, 0);
+    SDL_GPUShader *fragmentShader = SDL_ShaderCross_CompileGraphicsShaderFromSPIRV(device, &fragmentInfo, &fragmentMetadata->resource_info, 0);
+
+    // free the metadata
+    SDL_free((void *)fragmentMetadata);
 
     // free the file
     SDL_free(fragmentCode);
@@ -283,7 +300,7 @@ int main()
 
         // issue a draw call
         SDL_DrawGPUPrimitives(renderPass, 3, 1, 0, 0);
-        
+
         // end the render pass
         SDL_EndGPURenderPass(renderPass);
 
