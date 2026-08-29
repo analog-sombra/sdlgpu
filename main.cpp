@@ -1,12 +1,12 @@
 #include <iostream>
 #include <SDL3/SDL.h>
-/* Or be more specific: */
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_video.h>
 #include <SDL3_shadercross/SDL_shadercross.h>
 #include <fmt/core.h>
 #include <fmt/format.h>
+#include "shader.hpp"
 
 // the vertex input layout
 struct Vertex
@@ -17,9 +17,26 @@ struct Vertex
 
 // a list of vertices
 static Vertex vertices[]{
-    {0.0f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},   // top vertex
-    {-0.5f, -0.5f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f}, // bottom left vertex
-    {0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f}   // bottom right vertex
+    
+    // // triangle 1
+    // {0.0f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},   // top vertex
+    // {-0.5f, -0.5f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f}, // bottom left vertex
+    // {0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f},   // bottom right vertex
+
+    // // triangle 2
+    // {0.0f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f},  // bottom vertex of triangle 2
+    // {-0.5f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f}, // bottom left vertex of triangle 2
+    // {0.5f, -1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f}   // bottom right vertex of triangle 2
+
+    {-0.2f, 0.8f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+    {-0.8f, 0.8f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+    {-0.5f, 0.2f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+
+    {0.2f, -0.8f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+    {0.8f, -0.8f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+    {0.5f, -0.2f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
+
+
 };
 
 int main()
@@ -131,48 +148,8 @@ int main()
     SDL_EndGPUCopyPass(copyPass);
     SDL_SubmitGPUCommandBuffer(commandBuffer);
 
-    // load the vertex shader code
-    size_t vertexCodeSize;
-    void *vertexCode = SDL_LoadFile("shaders/vertex.spv", &vertexCodeSize);
-
-    // create the vertex shader
-    SDL_ShaderCross_SPIRV_Info vertexInfo{};
-    vertexInfo.bytecode = (Uint8 *)vertexCode;
-    vertexInfo.bytecode_size = vertexCodeSize;
-    vertexInfo.entrypoint = "main";
-    vertexInfo.shader_stage = SDL_SHADERCROSS_SHADERSTAGE_VERTEX;
-
-    // figure out shader metadata
-    const SDL_ShaderCross_GraphicsShaderMetadata *vertexMetadata = SDL_ShaderCross_ReflectGraphicsSPIRV((Uint8 *)vertexCode, vertexCodeSize, 0);
-
-    // cross compile to the appropriate shaderformat and create a shader object
-    SDL_GPUShader *vertexShader = SDL_ShaderCross_CompileGraphicsShaderFromSPIRV(device, &vertexInfo, &vertexMetadata->resource_info, 0);
-
-    // free the metadata
-    SDL_free((void *)vertexMetadata);
-
-    // free the file
-    SDL_free(vertexCode);
-
-    // create the fragment shader
-    size_t fragmentCodeSize;
-    void *fragmentCode = SDL_LoadFile("shaders/fragment.spv", &fragmentCodeSize);
-
-    // create the fragment shader
-    SDL_ShaderCross_SPIRV_Info fragmentInfo{};
-    fragmentInfo.bytecode = (Uint8 *)fragmentCode;
-    fragmentInfo.bytecode_size = fragmentCodeSize;
-    fragmentInfo.entrypoint = "main";
-    fragmentInfo.shader_stage = SDL_SHADERCROSS_SHADERSTAGE_FRAGMENT;
-
-    SDL_ShaderCross_GraphicsShaderMetadata *fragmentMetadata = SDL_ShaderCross_ReflectGraphicsSPIRV((Uint8 *)fragmentCode, fragmentCodeSize, 0);
-    SDL_GPUShader *fragmentShader = SDL_ShaderCross_CompileGraphicsShaderFromSPIRV(device, &fragmentInfo, &fragmentMetadata->resource_info, 0);
-
-    // free the metadata
-    SDL_free((void *)fragmentMetadata);
-
-    // free the file
-    SDL_free(fragmentCode);
+    SDL_GPUShader *vertexShader = CreateShader(device, VERTEX_SHADER, "shaders/vertex.spv");
+    SDL_GPUShader *fragmentShader = CreateShader(device, FRAGMENT_SHADER, "shaders/fragment.spv");
 
     SDL_GPUGraphicsPipelineCreateInfo pipelineInfo{};
 
@@ -264,20 +241,6 @@ int main()
             return -1;
         }
 
-        // if (swapchainTexture != NULL)
-        // {
-        //     SDL_GPUColorTargetInfo colorTargetInfo = {0};
-        //     colorTargetInfo.texture = swapchainTexture;
-        //     colorTargetInfo.clear_color = SDL_FColor{0.3f, 0.4f, 0.5f, 1.0f};
-        //     colorTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
-        //     colorTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
-
-        //     SDL_GPURenderPass *renderPass = SDL_BeginGPURenderPass(commandBuffer, &colorTargetInfo, 1, NULL);
-        //     SDL_EndGPURenderPass(renderPass);
-        // }
-
-        // SDL_SubmitGPUCommandBuffer(commandBuffer);
-
         // create the color target
         SDL_GPUColorTargetInfo colorTargetInfo{};
         colorTargetInfo.clear_color = {240 / 255.0f, 240 / 255.0f, 240 / 255.0f, 255 / 255.0f};
@@ -299,7 +262,7 @@ int main()
         SDL_BindGPUVertexBuffers(renderPass, 0, bufferBindings, 1); // bind one buffer starting from slot 0
 
         // issue a draw call
-        SDL_DrawGPUPrimitives(renderPass, 3, 1, 0, 0);
+        SDL_DrawGPUPrimitives(renderPass, 6, 1, 0, 0);
 
         // end the render pass
         SDL_EndGPURenderPass(renderPass);
@@ -315,9 +278,6 @@ int main()
     SDL_WaitForGPUIdle(device);
 
     SDL_ReleaseGPUGraphicsPipeline(device, graphicsPipeline);
-
-    SDL_ReleaseGPUShader(device, vertexShader);
-    SDL_ReleaseGPUShader(device, fragmentShader);
 
     // release buffers
     SDL_ReleaseGPUBuffer(device, vertexBuffer);
