@@ -7,6 +7,7 @@
 #include <fmt/core.h>
 #include <fmt/format.h>
 #include "shader.hpp"
+#include <SDL3_image/SDL_image.h>
 
 // the vertex input layout
 struct Vertex
@@ -17,27 +18,16 @@ struct Vertex
 
 // a list of vertices
 static Vertex vertices[]{
-    
-    // // triangle 1
-    // {0.0f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},   // top vertex
-    // {-0.5f, -0.5f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f}, // bottom left vertex
-    // {0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f},   // bottom right vertex
-
-    // // triangle 2
-    // {0.0f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f},  // bottom vertex of triangle 2
-    // {-0.5f, -1.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f}, // bottom left vertex of triangle 2
-    // {0.5f, -1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f}   // bottom right vertex of triangle 2
-
-    {-0.2f, 0.8f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
-    {-0.8f, 0.8f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
-    {-0.5f, 0.2f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
-
-    {0.2f, -0.8f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
-    {0.8f, -0.8f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
-    {0.5f, -0.2f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f},
-
-
+    // 4 vertives for rect
+    {-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f}, // bottom left
+    {0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},  // bottom right
+    {0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f},   // top right
+    {-0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f}   // top left
 };
+
+static uint32_t indices[] = {
+    0, 1, 2,
+    3, 0, 2};
 
 int main()
 {
@@ -107,42 +97,60 @@ int main()
     bufferInfo.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
     SDL_GPUBuffer *vertexBuffer = SDL_CreateGPUBuffer(device, &bufferInfo);
 
-    // create a transfer buffer to upload to the vertex buffer
-    SDL_GPUTransferBufferCreateInfo transferInfo{};
-    transferInfo.size = sizeof(vertices);
-    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    SDL_GPUTransferBuffer *transferBuffer = SDL_CreateGPUTransferBuffer(device, &transferInfo);
+    // create the index buffer
+    SDL_GPUBufferCreateInfo indexBufferInfo{};
+    indexBufferInfo.size = sizeof(indices);
+    indexBufferInfo.usage = SDL_GPU_BUFFERUSAGE_INDEX;
+    SDL_GPUBuffer *indexBuffer = SDL_CreateGPUBuffer(device, &indexBufferInfo);
 
-    // map the transfer buffer to a pointer
-    Vertex *data = (Vertex *)SDL_MapGPUTransferBuffer(device, transferBuffer, false);
+    // create transfer buffers to upload to GPU buffers
+    SDL_GPUTransferBufferCreateInfo vertexTransferInfo{};
+    vertexTransferInfo.size = sizeof(vertices);
+    vertexTransferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    SDL_GPUTransferBuffer *vertexTransferBuffer = SDL_CreateGPUTransferBuffer(device, &vertexTransferInfo);
 
-    // data[0] = vertices[0];
-    // data[1] = vertices[1];
-    // data[2] = vertices[2];
+    SDL_GPUTransferBufferCreateInfo indexTransferInfo{};
+    indexTransferInfo.size = sizeof(indices);
+    indexTransferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    SDL_GPUTransferBuffer *indexTransferBuffer = SDL_CreateGPUTransferBuffer(device, &indexTransferInfo);
 
-    // or you can copy them all in one operation
-    SDL_memcpy(data, vertices, sizeof(vertices));
+    // upload vertex data
+    Vertex *vertexData = (Vertex *)SDL_MapGPUTransferBuffer(device, vertexTransferBuffer, false);
+    SDL_memcpy(vertexData, vertices, sizeof(vertices));
+    SDL_UnmapGPUTransferBuffer(device, vertexTransferBuffer);
 
-    // unmap the pointer when you are done updating the transfer buffer
-    SDL_UnmapGPUTransferBuffer(device, transferBuffer);
+    // upload index data
+    uint32_t *indexData = (uint32_t *)SDL_MapGPUTransferBuffer(device, indexTransferBuffer, false);
+    SDL_memcpy(indexData, indices, sizeof(indices));
+    SDL_UnmapGPUTransferBuffer(device, indexTransferBuffer);
 
     // start a copy pass
     SDL_GPUCommandBuffer *commandBuffer = SDL_AcquireGPUCommandBuffer(device);
     SDL_GPUCopyPass *copyPass = SDL_BeginGPUCopyPass(commandBuffer);
 
-    // where is the data
-    SDL_GPUTransferBufferLocation location{};
-    location.transfer_buffer = transferBuffer;
-    location.offset = 0; // start from the beginning
+    // upload vertex buffer
+    SDL_GPUTransferBufferLocation vertexLocation{};
+    vertexLocation.transfer_buffer = vertexTransferBuffer;
+    vertexLocation.offset = 0;
 
-    // where to upload the data
-    SDL_GPUBufferRegion region{};
-    region.buffer = vertexBuffer;
-    region.size = sizeof(vertices); // size of the data in bytes
-    region.offset = 0;              // begin writing from the first vertex
+    SDL_GPUBufferRegion vertexRegion{};
+    vertexRegion.buffer = vertexBuffer;
+    vertexRegion.size = sizeof(vertices);
+    vertexRegion.offset = 0;
 
-    // upload the data
-    SDL_UploadToGPUBuffer(copyPass, &location, &region, true);
+    SDL_UploadToGPUBuffer(copyPass, &vertexLocation, &vertexRegion, false);
+
+    // upload index buffer
+    SDL_GPUTransferBufferLocation indexLocation{};
+    indexLocation.transfer_buffer = indexTransferBuffer;
+    indexLocation.offset = 0;
+
+    SDL_GPUBufferRegion indexRegion{};
+    indexRegion.buffer = indexBuffer;
+    indexRegion.size = sizeof(indices);
+    indexRegion.offset = 0;
+
+    SDL_UploadToGPUBuffer(copyPass, &indexLocation, &indexRegion, true);
 
     // end the copy pass
     SDL_EndGPUCopyPass(copyPass);
@@ -150,6 +158,12 @@ int main()
 
     SDL_GPUShader *vertexShader = CreateShader(device, VERTEX_SHADER, "shaders/vertex.spv");
     SDL_GPUShader *fragmentShader = CreateShader(device, FRAGMENT_SHADER, "shaders/fragment.spv");
+
+    SDL_Surface *imageData = IMG_Load("./assets/bg.jpg");
+    if (imageData == NULL)
+    {
+        SDL_Log("Could not load image data: %s", SDL_GetError());
+    }
 
     SDL_GPUGraphicsPipelineCreateInfo pipelineInfo{};
 
@@ -261,8 +275,15 @@ int main()
 
         SDL_BindGPUVertexBuffers(renderPass, 0, bufferBindings, 1); // bind one buffer starting from slot 0
 
-        // issue a draw call
-        SDL_DrawGPUPrimitives(renderPass, 6, 1, 0, 0);
+        // bind the index buffer
+        SDL_GPUBufferBinding indexBufferBinding{};
+        indexBufferBinding.buffer = indexBuffer;
+        indexBufferBinding.offset = 0;
+
+        SDL_BindGPUIndexBuffer(renderPass, &indexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
+
+        // issue an indexed draw call (6 indices = 2 triangles for a rectangle)
+        SDL_DrawGPUIndexedPrimitives(renderPass, 6, 1, 0, 0, 0);
 
         // end the render pass
         SDL_EndGPURenderPass(renderPass);
@@ -281,7 +302,15 @@ int main()
 
     // release buffers
     SDL_ReleaseGPUBuffer(device, vertexBuffer);
-    SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
+    SDL_ReleaseGPUBuffer(device, indexBuffer);
+    SDL_ReleaseGPUTransferBuffer(device, vertexTransferBuffer);
+    SDL_ReleaseGPUTransferBuffer(device, indexTransferBuffer);
+
+    // free surface if loaded
+    if (imageData != NULL)
+    {
+        SDL_DestroySurface(imageData);
+    }
 
     SDL_ReleaseWindowFromGPUDevice(device, window);
     SDL_DestroyGPUDevice(device);
