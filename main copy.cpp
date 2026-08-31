@@ -8,30 +8,21 @@
 #include <fmt/format.h>
 #include "shader.hpp"
 #include <SDL3_image/SDL_image.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-struct Transform
-{
-    glm::vec3 position{0.0f, 0.0f, 0.0f};
-    glm::vec3 rotation{0.0f, 0.0f, 0.0f};
-    glm::vec3 scale{1.0f, 1.0f, 1.0f};
-};
 
 // the vertex input layout
 struct Vertex
 {
-    float x, y, z; // vec3 position
-    float u, v;    // texture coordinates
+    float x, y, z;    // vec3 position
+    float r, g, b, a; // vec4 color
 };
 
 // a list of vertices
 static Vertex vertices[]{
     // 4 vertives for rect
-    {-0.5f, -0.5f, 0.0f, 0.0f, 0.0f}, // bottom left
-    {0.5f, -0.5f, 0.0f, 1.0f, 0.0f},  // bottom right
-    {0.5f, 0.5f, 0.0f, 1.0f, 1.0f},   // top right
-    {-0.5f, 0.5f, 0.0f, 0.0f, 1.0f}   // top left
+    {-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f}, // bottom left
+    {0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},  // bottom right
+    {0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f},   // top right
+    {-0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f}   // top left
 };
 
 static uint32_t indices[] = {
@@ -100,37 +91,6 @@ int main()
 #pragma endregion
 
 #pragma region triangle
-
-    struct TransformUniform
-    {
-        glm::mat4 model;
-    };
-
-    Transform transform;
-
-    transform.position = {0.0f, 0.0f, 0.0f};
-    transform.rotation = {0.0f, 0.0f, 0.0f};
-    transform.scale = {0.6f, 1.0f, 1.0f};
-
-
-    glm::mat4 model = glm::mat4(1.0f);
-
-    model = glm::translate(
-        model,
-        transform.position);
-
-    model = glm::rotate(
-        model,
-        glm::radians(transform.rotation.z),
-        glm::vec3(0.0f, 0.0f, 1.0f));
-
-    model = glm::scale(
-        model,
-        transform.scale);
-
-    TransformUniform transformData;
-    transformData.model = model;
-
     // create the vertex buffer
     SDL_GPUBufferCreateInfo bufferInfo{};
     bufferInfo.size = sizeof(vertices);
@@ -143,39 +103,6 @@ int main()
     indexBufferInfo.usage = SDL_GPU_BUFFERUSAGE_INDEX;
     SDL_GPUBuffer *indexBuffer = SDL_CreateGPUBuffer(device, &indexBufferInfo);
 
-    // creating surface from image data
-    SDL_Surface *imageData = IMG_Load("./assets/bg.jpg");
-    if (imageData == NULL)
-    {
-        SDL_Log("Could not load image data: %s", SDL_GetError());
-    }
-    SDL_FlipSurface(imageData, SDL_FLIP_VERTICAL);
-
-    SDL_Surface *rgbaSurface =
-        SDL_ConvertSurface(imageData, SDL_PIXELFORMAT_RGBA32);
-
-    if (rgbaSurface == NULL)
-    {
-        SDL_Log("Could not convert image: %s", SDL_GetError());
-    }
-
-    // create the GPU texture from the image data
-    SDL_GPUTextureCreateInfo textureInfo{};
-
-    textureInfo.type = SDL_GPU_TEXTURETYPE_2D;
-    textureInfo.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-    textureInfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
-
-    textureInfo.width = rgbaSurface->w;
-    textureInfo.height = rgbaSurface->h;
-
-    textureInfo.layer_count_or_depth = 1;
-    textureInfo.num_levels = 1;
-    textureInfo.sample_count = SDL_GPU_SAMPLECOUNT_1;
-
-    SDL_GPUTexture *texture =
-        SDL_CreateGPUTexture(device, &textureInfo);
-
     // create transfer buffers to upload to GPU buffers
     SDL_GPUTransferBufferCreateInfo vertexTransferInfo{};
     vertexTransferInfo.size = sizeof(vertices);
@@ -187,11 +114,6 @@ int main()
     indexTransferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     SDL_GPUTransferBuffer *indexTransferBuffer = SDL_CreateGPUTransferBuffer(device, &indexTransferInfo);
 
-    SDL_GPUTransferBufferCreateInfo transferInfo{};
-    transferInfo.size = static_cast<Uint32>(rgbaSurface->w * rgbaSurface->h * 4);
-    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    SDL_GPUTransferBuffer *textureTransferBuffer = SDL_CreateGPUTransferBuffer(device, &transferInfo);
-
     // upload vertex data
     Vertex *vertexData = (Vertex *)SDL_MapGPUTransferBuffer(device, vertexTransferBuffer, false);
     SDL_memcpy(vertexData, vertices, sizeof(vertices));
@@ -201,11 +123,6 @@ int main()
     uint32_t *indexData = (uint32_t *)SDL_MapGPUTransferBuffer(device, indexTransferBuffer, false);
     SDL_memcpy(indexData, indices, sizeof(indices));
     SDL_UnmapGPUTransferBuffer(device, indexTransferBuffer);
-
-    // upload texture data
-    void *mapped = SDL_MapGPUTransferBuffer(device, textureTransferBuffer, false);
-    SDL_memcpy(mapped, rgbaSurface->pixels, rgbaSurface->h * rgbaSurface->pitch);
-    SDL_UnmapGPUTransferBuffer(device, textureTransferBuffer);
 
     // start a copy pass
     SDL_GPUCommandBuffer *commandBuffer = SDL_AcquireGPUCommandBuffer(device);
@@ -235,52 +152,18 @@ int main()
 
     SDL_UploadToGPUBuffer(copyPass, &indexLocation, &indexRegion, true);
 
-    SDL_GPUTextureTransferInfo source{};
-    source.transfer_buffer = textureTransferBuffer;
-    source.offset = 0;
-    source.pixels_per_row = rgbaSurface->w;
-    source.rows_per_layer = rgbaSurface->h;
-
-    SDL_GPUTextureRegion destination{};
-    destination.texture = texture;
-    destination.mip_level = 0;
-    destination.layer = 0;
-
-    destination.x = 0;
-    destination.y = 0;
-    destination.z = 0;
-
-    destination.w = rgbaSurface->w;
-    destination.h = rgbaSurface->h;
-    destination.d = 1;
-    SDL_UploadToGPUTexture(copyPass, &source, &destination, false);
-
     // end the copy pass
     SDL_EndGPUCopyPass(copyPass);
     SDL_SubmitGPUCommandBuffer(commandBuffer);
 
-    SDL_GPUShader *vertexShader = CreateShader(device, VERTEX_SHADER, "shaders/texturevertex.spv");
-    SDL_GPUShader *fragmentShader = CreateShader(device, FRAGMENT_SHADER, "shaders/texturefragment.spv");
+    SDL_GPUShader *vertexShader = CreateShader(device, VERTEX_SHADER, "shaders/vertex.spv");
+    SDL_GPUShader *fragmentShader = CreateShader(device, FRAGMENT_SHADER, "shaders/fragment.spv");
 
-    // creating the GPU sampler
-    SDL_GPUSamplerCreateInfo samplerInfo{};
-    samplerInfo.min_filter = SDL_GPU_FILTER_LINEAR;
-    samplerInfo.mag_filter = SDL_GPU_FILTER_LINEAR;
-
-    samplerInfo.mipmap_mode =
-        SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
-
-    samplerInfo.address_mode_u =
-        SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-
-    samplerInfo.address_mode_v =
-        SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-
-    samplerInfo.address_mode_w =
-        SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-
-    SDL_GPUSampler *sampler =
-        SDL_CreateGPUSampler(device, &samplerInfo);
+    SDL_Surface *imageData = IMG_Load("./assets/bg.jpg");
+    if (imageData == NULL)
+    {
+        SDL_Log("Could not load image data: %s", SDL_GetError());
+    }
 
     SDL_GPUGraphicsPipelineCreateInfo pipelineInfo{};
 
@@ -313,7 +196,7 @@ int main()
     // a_color
     vertexAttributes[1].buffer_slot = 0;                             // use buffer at slot 0
     vertexAttributes[1].location = 1;                                // layout (location = 1) in shader
-    vertexAttributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2; // vec2
+    vertexAttributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4; // vec4
     vertexAttributes[1].offset = sizeof(float) * 3;                  // 4th float from current buffer position
 
     pipelineInfo.vertex_input_state.num_vertex_attributes = 2;
@@ -398,18 +281,6 @@ int main()
         indexBufferBinding.offset = 0;
 
         SDL_BindGPUIndexBuffer(renderPass, &indexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
-
-        // bind the sampler
-        SDL_GPUTextureSamplerBinding textureBinding{};
-        textureBinding.texture = texture;
-        textureBinding.sampler = sampler;
-        SDL_BindGPUFragmentSamplers(renderPass, 0, &textureBinding, 1);
-
-        SDL_PushGPUVertexUniformData(
-            commandBuffer,
-            0,
-            &model,
-            sizeof(model));
 
         // issue an indexed draw call (6 indices = 2 triangles for a rectangle)
         SDL_DrawGPUIndexedPrimitives(renderPass, 6, 1, 0, 0, 0);
