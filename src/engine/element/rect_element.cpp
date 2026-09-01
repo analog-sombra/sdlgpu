@@ -183,16 +183,22 @@ RectElement::~RectElement()
 void RectElement::Update()
 {
     // rotate the rectangle over time
+    transform.rotation.y += 0.05f;
+    transform.rotation.x += 0.05f;
     transform.rotation.z += 0.05f;
 
     // recalculate the model matrix based on updated transform
     model = glm::mat4(1.0f);
     model = glm::translate(model, transform.position);
+    model = glm::translate(model, glm::vec3(0.0f, 0.0f, -3.0f));
+    model = glm::rotate(model, glm::radians(transform.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    model = glm::rotate(model, glm::radians(transform.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
     model = glm::rotate(model, glm::radians(transform.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
     model = glm::scale(model, transform.scale);
 
     float aspect = 1280.0f / 720.0f; // width / height
-    projection = glm::ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
+    // projection = glm::ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
+    projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
 }
 
 void RectElement::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *commandBuffer)

@@ -6,7 +6,6 @@ void SDLCALL MyLogCallback(void *userdata, int category, SDL_LogPriority priorit
     if (priority >= SDL_LOG_PRIORITY_ERROR)
     {
         // Breakpoint here in your IDE to catch any SDL error instantly
-        // SDL_Log("CRITICAL: %s", message);
         spdlog::error("SDL Error: {}", message);
     }
 }
@@ -22,11 +21,57 @@ Game::Game(std::string title)
 
     window.reset(SDL_CreateWindow(title.c_str(), SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_RESIZABLE));
     device.reset(SDL_CreateGPUDevice(SDL_ShaderCross_GetSPIRVShaderFormats(), true, NULL));
-
     SDL_ClaimWindowForGPUDevice(device.get(), window.get());
 
     // Initialize RectElement with device and window pointers
     rectElement.Initialize(device.get(), window.get());
+
+    spdlog::info("GPU driver: {}", SDL_GetGPUDeviceDriver(device.get()));
+
+    bool issup = SDL_WindowSupportsGPUPresentMode(
+        device.get(),
+        window.get(),
+        SDL_GPU_PRESENTMODE_IMMEDIATE);
+    if (issup)
+    {
+        spdlog::info("Immediate present mode is supported");
+    }
+    else
+    {
+        spdlog::warn("Immediate present mode is not supported");
+    }
+
+    if (SDL_WindowSupportsGPUPresentMode(
+            device.get(),
+            window.get(),
+            SDL_GPU_PRESENTMODE_IMMEDIATE))
+    {
+        SDL_SetGPUSwapchainParameters(
+            device.get(),
+            window.get(),
+            SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
+            SDL_GPU_PRESENTMODE_IMMEDIATE);
+    }
+    else
+    {
+        spdlog::info("Immediate present mode is not supported");
+    }
+
+    SDL_PropertiesID props = SDL_GetGPUDeviceProperties(device.get());
+
+    const char *gpuName = SDL_GetStringProperty(
+        props,
+        SDL_PROP_GPU_DEVICE_NAME_STRING,
+        "Unknown");
+
+    const char *driverName = SDL_GetStringProperty(
+        props,
+        SDL_PROP_GPU_DEVICE_DRIVER_NAME_STRING,
+        "Unknown");
+
+    spdlog::info("GPU: {}", gpuName);
+    spdlog::info("Driver: {}", driverName);
+    spdlog::info("Backend: {}", SDL_GetGPUDeviceDriver(device.get()));
 }
 
 Game::~Game()
@@ -45,11 +90,23 @@ Game::~Game()
 
 void Game::Run()
 {
+    Uint64 fps = 0;
+    Uint64 fpsTimer = SDL_GetTicks();
+
     while (running)
     {
         HandleEvents();
         Update();
         Render();
+        fps++;
+
+        Uint64 now = SDL_GetTicks();
+        if (now - fpsTimer >= 1000)
+        {
+            SDL_SetWindowTitle(window.get(), fmt::format("Engine Window - FPS: {}", fps).c_str());
+            fps = 0;
+            fpsTimer = now;
+        }
     }
 }
 
@@ -106,26 +163,26 @@ void Game::GetAllRenderDrivers()
     int numDrivers = SDL_GetNumRenderDrivers();
     for (int i = 0; i < numDrivers; ++i)
     {
-        SDL_Log(fmt::format("Render Driver {}: {}", i, SDL_GetRenderDriver(i)).c_str());
+        spdlog::info("Render Driver {}: {}", i, SDL_GetRenderDriver(i));
     }
 }
 
 void Game::GetCurrentRenderDriver()
 {
-    SDL_Log("GPU driver: %s", SDL_GetGPUDeviceDriver(device.get()));
+    spdlog::info("GPU driver: {}", SDL_GetGPUDeviceDriver(device.get()));
 }
 
 void Game::GetSupportedShaderFormats()
 {
     SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(device.get());
     if (formats & SDL_GPU_SHADERFORMAT_SPIRV)
-        SDL_Log("Supports SPIR-V");
+        spdlog::info("Supports SPIR-V");
     if (formats & SDL_GPU_SHADERFORMAT_DXIL)
-        SDL_Log("Supports DXIL");
+        spdlog::info("Supports DXIL");
     if (formats & SDL_GPU_SHADERFORMAT_DXBC)
-        SDL_Log("Supports DXBC");
+        spdlog::info("Supports DXBC");
     if (formats & SDL_GPU_SHADERFORMAT_MSL)
-        SDL_Log("Supports MSL");
+        spdlog::info("Supports MSL");
     if (formats & SDL_GPU_SHADERFORMAT_METALLIB)
-        SDL_Log("Supports Metal");
+        spdlog::info("Supports Metal");
 }
