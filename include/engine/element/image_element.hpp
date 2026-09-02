@@ -1,13 +1,13 @@
-#ifndef __RECT_ELEMENT_HPP__
-#define __RECT_ELEMENT_HPP__
+#ifndef __IMAGE_ELEMENT_HPP__
+#define __IMAGE_ELEMENT_HPP__
 
 #include <memory>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_video.h>
+#include <SDL3_image/SDL_image.h>
 #include "shader.hpp"
-#include "engine/gpu_utils.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -58,13 +58,33 @@ namespace Engine
         }
     };
 
-    struct Vertex
+    struct GPUTextureDeleter
     {
-        float x, y, z;    // vec3 position
-        float r, g, b, a; // vec4 color
+        SDL_GPUDevice *device = nullptr;
+        void operator()(SDL_GPUTexture *texture) const
+        {
+            if (texture && device)
+                SDL_ReleaseGPUTexture(device, texture);
+        }
     };
 
-    class RectElement
+    struct GPUSamplerDeleter
+    {
+        SDL_GPUDevice *device = nullptr;
+        void operator()(SDL_GPUSampler *sampler) const
+        {
+            if (sampler && device)
+                SDL_ReleaseGPUSampler(device, sampler);
+        }
+    };
+
+    struct Vertex
+    {
+        float x, y, z; // vec3 position
+        float u, v;    // texture coordinates
+    };
+
+    class ImageElement
     {
     private:
         SDL_GPUDevice *device; // Not owned - borrowed from Game
@@ -78,16 +98,17 @@ namespace Engine
         std::unique_ptr<SDL_GPUBuffer, GPUBufferDeleter> indexBuffer;
         std::unique_ptr<SDL_GPUTransferBuffer, GPUTransferBufferDeleter> vertexTransferBuffer;
         std::unique_ptr<SDL_GPUTransferBuffer, GPUTransferBufferDeleter> indexTransferBuffer;
+        std::unique_ptr<SDL_GPUTransferBuffer, GPUTransferBufferDeleter> textureTransferBuffer;
         std::unique_ptr<SDL_GPUGraphicsPipeline, GraphicsPipelineDeleter> graphicsPipeline;
+        std::unique_ptr<SDL_GPUTexture, GPUTextureDeleter> texture;
+        std::unique_ptr<SDL_GPUSampler, GPUSamplerDeleter> sampler;
 
     public:
-        RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow);
-        ~RectElement();
-
+        ImageElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow);
+        ~ImageElement();
 
         void Update();
         void Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *commandBuffer);
     };
 }
-
-#endif // __RECT_ELEMENT_HPP__
+#endif // __IMAGE_ELEMENT_HPP__

@@ -1,40 +1,79 @@
-#include "engine/element/rect_element.hpp"
+#include "engine/element/image_element.hpp"
 
 using namespace Engine;
 
-RectElement::RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow)
-    : device(gpuDevice), window(sdlWindow)
+ImageElement::ImageElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow) : device(gpuDevice), window(sdlWindow)
 {
-    Vertex vertices[]{
+    static Vertex vertices[]{
         // 4 vertives for rect
-        {-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f}, // bottom left
-        {0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f},  // bottom right
-        {0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f},   // top right
-        {-0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f}   // top left
+        {-0.5f, -0.5f, 0.0f, 0.0f, 0.0f}, // bottom left
+        {0.5f, -0.5f, 0.0f, 1.0f, 0.0f},  // bottom right
+        {0.5f, 0.5f, 0.0f, 1.0f, 1.0f},   // top right
+        {-0.5f, 0.5f, 0.0f, 0.0f, 1.0f}   // top left
     };
 
-    uint32_t indices[] = {
+    static uint32_t indices[] = {
         0, 1, 2,
         3, 0, 2};
 
-    TransformUniform transformData;
-    transformData.model = model;
-    transformData.projection = projection;
-
     // create the vertex buffer
-    auto vbuf = createGpuBufferInfo(device, SDL_GPU_BUFFERUSAGE_VERTEX, sizeof(vertices));
+    SDL_GPUBufferCreateInfo bufferInfo{};
+    bufferInfo.size = sizeof(vertices);
+    bufferInfo.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+    auto vbuf = SDL_CreateGPUBuffer(device, &bufferInfo);
     vertexBuffer = std::unique_ptr<SDL_GPUBuffer, GPUBufferDeleter>(vbuf, {device});
 
     // create the index buffer
-    auto ibuf = createGpuBufferInfo(device, SDL_GPU_BUFFERUSAGE_INDEX, sizeof(indices));
+    SDL_GPUBufferCreateInfo indexBufferInfo{};
+    indexBufferInfo.size = sizeof(indices);
+    indexBufferInfo.usage = SDL_GPU_BUFFERUSAGE_INDEX;
+    auto ibuf = SDL_CreateGPUBuffer(device, &indexBufferInfo);
     indexBuffer = std::unique_ptr<SDL_GPUBuffer, GPUBufferDeleter>(ibuf, {device});
 
+    // creating surface from image data
+    SDL_Surface *imageData = IMG_Load("./assets/bg.jpg");
+
+    SDL_FlipSurface(imageData, SDL_FLIP_VERTICAL);
+
+    SDL_Surface *rgbaSurface =
+        SDL_ConvertSurface(imageData, SDL_PIXELFORMAT_RGBA32);
+
+    // create the GPU texture from the image data
+    SDL_GPUTextureCreateInfo textureInfo{};
+
+    textureInfo.type = SDL_GPU_TEXTURETYPE_2D;
+    textureInfo.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    textureInfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+
+    textureInfo.width = rgbaSurface->w;
+    textureInfo.height = rgbaSurface->h;
+
+    textureInfo.layer_count_or_depth = 1;
+    textureInfo.num_levels = 1;
+    textureInfo.sample_count = SDL_GPU_SAMPLECOUNT_1;
+
+    auto tex = SDL_CreateGPUTexture(device, &textureInfo);
+    texture = std::unique_ptr<SDL_GPUTexture, GPUTextureDeleter>(tex, {device});
+
     // create transfer buffers to upload to GPU buffers
-    auto vxbuf = createGpuTransferBufferInfo(device, sizeof(vertices));
+    SDL_GPUTransferBufferCreateInfo vertexTransferInfo{};
+    vertexTransferInfo.size = sizeof(vertices);
+    vertexTransferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    auto vxbuf = SDL_CreateGPUTransferBuffer(device, &vertexTransferInfo);
     vertexTransferBuffer = std::unique_ptr<SDL_GPUTransferBuffer, GPUTransferBufferDeleter>(vxbuf, {device});
 
-    auto ixbuf = createGpuTransferBufferInfo(device, sizeof(indices));
+    SDL_GPUTransferBufferCreateInfo indexTransferInfo{};
+    indexTransferInfo.size = sizeof(indices);
+    indexTransferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    auto ixbuf = SDL_CreateGPUTransferBuffer(device, &indexTransferInfo);
     indexTransferBuffer = std::unique_ptr<SDL_GPUTransferBuffer, GPUTransferBufferDeleter>(ixbuf, {device});
+
+    SDL_GPUTransferBufferCreateInfo transferInfo{};
+    transferInfo.size = static_cast<Uint32>(rgbaSurface->w * rgbaSurface->h * 4);
+    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    // SDL_GPUTransferBuffer *textureTransferBuffer = SDL_CreateGPUTransferBuffer(device, &transferInfo);
+    auto texTransferBuf = SDL_CreateGPUTransferBuffer(device, &transferInfo);
+    textureTransferBuffer = std::unique_ptr<SDL_GPUTransferBuffer, GPUTransferBufferDeleter>(texTransferBuf, {device});
 
     // upload vertex data
     Vertex *vertexData = (Vertex *)SDL_MapGPUTransferBuffer(device, vertexTransferBuffer.get(), false);
@@ -46,22 +85,86 @@ RectElement::RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow)
     SDL_memcpy(indexData, indices, sizeof(indices));
     SDL_UnmapGPUTransferBuffer(device, indexTransferBuffer.get());
 
+    // upload texture data
+    void *mapped = SDL_MapGPUTransferBuffer(device, textureTransferBuffer.get(), false);
+    SDL_memcpy(mapped, rgbaSurface->pixels, rgbaSurface->h * rgbaSurface->pitch);
+    SDL_UnmapGPUTransferBuffer(device, textureTransferBuffer.get());
+
     // start a copy pass
     SDL_GPUCommandBuffer *commandBuffer = SDL_AcquireGPUCommandBuffer(device);
     SDL_GPUCopyPass *copyPass = SDL_BeginGPUCopyPass(commandBuffer);
 
     // upload vertex buffer
-    uploadBufferData(copyPass, vertexBuffer.get(), vertexTransferBuffer.get(), sizeof(vertices));
+    SDL_GPUTransferBufferLocation vertexLocation{};
+    vertexLocation.transfer_buffer = vertexTransferBuffer.get();
+    vertexLocation.offset = 0;
+
+    SDL_GPUBufferRegion vertexRegion{};
+    vertexRegion.buffer = vertexBuffer.get();
+    vertexRegion.size = sizeof(vertices);
+    vertexRegion.offset = 0;
+
+    SDL_UploadToGPUBuffer(copyPass, &vertexLocation, &vertexRegion, false);
 
     // upload index buffer
-    uploadBufferData(copyPass, indexBuffer.get(), indexTransferBuffer.get(), sizeof(indices));
+    SDL_GPUTransferBufferLocation indexLocation{};
+    indexLocation.transfer_buffer = indexTransferBuffer.get();
+    indexLocation.offset = 0;
+
+    SDL_GPUBufferRegion indexRegion{};
+    indexRegion.buffer = indexBuffer.get();
+    indexRegion.size = sizeof(indices);
+    indexRegion.offset = 0;
+
+    SDL_UploadToGPUBuffer(copyPass, &indexLocation, &indexRegion, true);
+
+    SDL_GPUTextureTransferInfo source{};
+    source.transfer_buffer = textureTransferBuffer.get();
+    source.offset = 0;
+    source.pixels_per_row = rgbaSurface->w;
+    source.rows_per_layer = rgbaSurface->h;
+
+    SDL_GPUTextureRegion destination{};
+    destination.texture = texture.get();
+    destination.mip_level = 0;
+    destination.layer = 0;
+
+    destination.x = 0;
+    destination.y = 0;
+    destination.z = 0;
+
+    destination.w = rgbaSurface->w;
+    destination.h = rgbaSurface->h;
+    destination.d = 1;
+    SDL_UploadToGPUTexture(copyPass, &source, &destination, false);
 
     // end the copy pass
     SDL_EndGPUCopyPass(copyPass);
     SDL_SubmitGPUCommandBuffer(commandBuffer);
 
-    SDL_GPUShader *vertexShader = CreateShader(device, VERTEX_SHADER, "shaders/vertex.spv");
-    SDL_GPUShader *fragmentShader = CreateShader(device, FRAGMENT_SHADER, "shaders/fragment.spv");
+    SDL_GPUShader *vertexShader = CreateShader(device, VERTEX_SHADER, "shaders/texturevertex.spv");
+    SDL_GPUShader *fragmentShader = CreateShader(device, FRAGMENT_SHADER, "shaders/texturefragment.spv");
+
+    // creating the GPU sampler
+    SDL_GPUSamplerCreateInfo samplerInfo{};
+    samplerInfo.min_filter = SDL_GPU_FILTER_LINEAR;
+    samplerInfo.mag_filter = SDL_GPU_FILTER_LINEAR;
+
+    samplerInfo.mipmap_mode =
+        SDL_GPU_SAMPLERMIPMAPMODE_NEAREST;
+
+    samplerInfo.address_mode_u =
+        SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+
+    samplerInfo.address_mode_v =
+        SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+
+    samplerInfo.address_mode_w =
+        SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+
+    auto samplerPtr =
+        SDL_CreateGPUSampler(device, &samplerInfo);
+    sampler = std::unique_ptr<SDL_GPUSampler, GPUSamplerDeleter>(samplerPtr, GPUSamplerDeleter{device});
 
     SDL_GPUGraphicsPipelineCreateInfo pipelineInfo{};
 
@@ -94,7 +197,7 @@ RectElement::RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow)
     // a_color
     vertexAttributes[1].buffer_slot = 0;                             // use buffer at slot 0
     vertexAttributes[1].location = 1;                                // layout (location = 1) in shader
-    vertexAttributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4; // vec4
+    vertexAttributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2; // vec2
     vertexAttributes[1].offset = sizeof(float) * 3;                  // 4th float from current buffer position
 
     pipelineInfo.vertex_input_state.num_vertex_attributes = 2;
@@ -115,25 +218,26 @@ RectElement::RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow)
     pipelineInfo.target_info.num_color_targets = 1;
     pipelineInfo.target_info.color_target_descriptions = colorTargetDescriptions;
 
-    // create the pipeline
-    // SDL_GPUGraphicsPipeline *graphicsPipeline = SDL_CreateGPUGraphicsPipeline(device, &pipelineInfo);
     auto pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipelineInfo);
     graphicsPipeline = std::unique_ptr<SDL_GPUGraphicsPipeline, GraphicsPipelineDeleter>(pipeline, {device});
+
     // we don't need to store the shaders after creating the pipeline
     SDL_ReleaseGPUShader(device, vertexShader);
     SDL_ReleaseGPUShader(device, fragmentShader);
 }
 
-RectElement::~RectElement()
+ImageElement::~ImageElement()
 {
     graphicsPipeline.reset();
     indexTransferBuffer.reset();
     vertexTransferBuffer.reset();
     indexBuffer.reset();
     vertexBuffer.reset();
+    sampler.reset();
+    texture.reset();
 }
 
-void RectElement::Update()
+void ImageElement::Update()
 {
     // rotate the rectangle over time
     transform.rotation.y += 0.05f;
@@ -154,7 +258,7 @@ void RectElement::Update()
     projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
 }
 
-void RectElement::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *commandBuffer)
+void ImageElement::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *commandBuffer)
 {
     // bind the graphics pipeline
     SDL_BindGPUGraphicsPipeline(renderPass, graphicsPipeline.get());
@@ -173,6 +277,12 @@ void RectElement::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *co
 
     SDL_BindGPUIndexBuffer(renderPass, &indexBufferBinding, SDL_GPU_INDEXELEMENTSIZE_32BIT);
 
+    // bind the sampler
+    SDL_GPUTextureSamplerBinding textureBinding{};
+    textureBinding.texture = texture.get();
+    textureBinding.sampler = sampler.get();
+    SDL_BindGPUFragmentSamplers(renderPass, 0, &textureBinding, 1);
+
     // Create uniform data struct with both model and projection matrices
     TransformUniform uniformData;
     uniformData.model = model;
@@ -188,5 +298,3 @@ void RectElement::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *co
     // issue an indexed draw call (6 indices = 2 triangles for a rectangle)
     SDL_DrawGPUIndexedPrimitives(renderPass, 6, 1, 0, 0, 0);
 }
-
-// 225
