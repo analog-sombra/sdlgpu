@@ -27,37 +27,6 @@ namespace Engine
         glm::vec3 scale{1.0f, 1.0f, 1.0f};
     };
 
-    // Custom deleters for SDL objects that require device pointer
-    struct GraphicsPipelineDeleter
-    {
-        SDL_GPUDevice *device = nullptr;
-        void operator()(SDL_GPUGraphicsPipeline *pipeline) const
-        {
-            if (pipeline && device)
-                SDL_ReleaseGPUGraphicsPipeline(device, pipeline);
-        }
-    };
-
-    struct GPUBufferDeleter
-    {
-        SDL_GPUDevice *device = nullptr;
-        void operator()(SDL_GPUBuffer *buffer) const
-        {
-            if (buffer && device)
-                SDL_ReleaseGPUBuffer(device, buffer);
-        }
-    };
-
-    struct GPUTransferBufferDeleter
-    {
-        SDL_GPUDevice *device = nullptr;
-        void operator()(SDL_GPUTransferBuffer *buffer) const
-        {
-            if (buffer && device)
-                SDL_ReleaseGPUTransferBuffer(device, buffer);
-        }
-    };
-
     struct Vertex
     {
         float x, y, z;    // vec3 position
@@ -83,7 +52,6 @@ namespace Engine
     public:
         RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow);
         ~RectElement();
-
 
         void Update();
         void Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *commandBuffer);

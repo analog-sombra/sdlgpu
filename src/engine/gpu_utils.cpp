@@ -43,4 +43,32 @@ namespace Engine
         SDL_UploadToGPUBuffer(copyPass, &vertexLocation, &vertexRegion, false);
     }
 
+    SDL_GPUColorTargetDescription createColorTargetDescription(
+        SDL_GPUDevice *device,
+        SDL_Window *window)
+    {
+        // describe the color target
+        SDL_GPUColorTargetDescription colorTargetDescriptions[1];
+        colorTargetDescriptions[0] = {};
+        colorTargetDescriptions[0].blend_state.enable_blend = true;
+        colorTargetDescriptions[0].blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
+        colorTargetDescriptions[0].blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+        colorTargetDescriptions[0].blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+        colorTargetDescriptions[0].blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+        colorTargetDescriptions[0].blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+        colorTargetDescriptions[0].blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+        colorTargetDescriptions[0].format = SDL_GetGPUSwapchainTextureFormat(device, window);
+        return colorTargetDescriptions[0];
+    }
+
+    SDL_GPUVertexBufferDescription createVertexBufferDescription(Uint32 size)
+    {
+        // describe the vertex buffers
+        SDL_GPUVertexBufferDescription vertexBufferDesctiptions[1];
+        vertexBufferDesctiptions[0].slot = 0;
+        vertexBufferDesctiptions[0].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+        vertexBufferDesctiptions[0].instance_step_rate = 0;
+        vertexBufferDesctiptions[0].pitch = size;
+        return vertexBufferDesctiptions[0];
+    }
 }

@@ -73,11 +73,7 @@ RectElement::RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow)
     pipelineInfo.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
 
     // describe the vertex buffers
-    SDL_GPUVertexBufferDescription vertexBufferDesctiptions[1];
-    vertexBufferDesctiptions[0].slot = 0;
-    vertexBufferDesctiptions[0].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
-    vertexBufferDesctiptions[0].instance_step_rate = 0;
-    vertexBufferDesctiptions[0].pitch = sizeof(Vertex);
+    SDL_GPUVertexBufferDescription vertexBufferDesctiptions[1] = {createVertexBufferDescription(sizeof(Vertex))};
 
     pipelineInfo.vertex_input_state.num_vertex_buffers = 1;
     pipelineInfo.vertex_input_state.vertex_buffer_descriptions = vertexBufferDesctiptions;
@@ -101,22 +97,12 @@ RectElement::RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow)
     pipelineInfo.vertex_input_state.vertex_attributes = vertexAttributes;
 
     // describe the color target
-    SDL_GPUColorTargetDescription colorTargetDescriptions[1];
-    colorTargetDescriptions[0] = {};
-    colorTargetDescriptions[0].blend_state.enable_blend = true;
-    colorTargetDescriptions[0].blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
-    colorTargetDescriptions[0].blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
-    colorTargetDescriptions[0].blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
-    colorTargetDescriptions[0].blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-    colorTargetDescriptions[0].blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
-    colorTargetDescriptions[0].blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-    colorTargetDescriptions[0].format = SDL_GetGPUSwapchainTextureFormat(device, window);
+    SDL_GPUColorTargetDescription colorTargetDescriptions = createColorTargetDescription(device, window);
 
     pipelineInfo.target_info.num_color_targets = 1;
-    pipelineInfo.target_info.color_target_descriptions = colorTargetDescriptions;
+    pipelineInfo.target_info.color_target_descriptions = &colorTargetDescriptions;
 
     // create the pipeline
-    // SDL_GPUGraphicsPipeline *graphicsPipeline = SDL_CreateGPUGraphicsPipeline(device, &pipelineInfo);
     auto pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipelineInfo);
     graphicsPipeline = std::unique_ptr<SDL_GPUGraphicsPipeline, GraphicsPipelineDeleter>(pipeline, {device});
     // we don't need to store the shaders after creating the pipeline
