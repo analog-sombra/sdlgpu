@@ -71,4 +71,20 @@ namespace Engine
         vertexBufferDesctiptions[0].pitch = size;
         return vertexBufferDesctiptions[0];
     }
+
+    std::vector<SDL_GPUVertexAttribute> createVertexAttribute(const std::vector<CreateVertexAttribute> &attributes)
+    {
+        std::vector<SDL_GPUVertexAttribute> vertexAttributes;
+        int i = 0;
+        for (const auto &attr : attributes)
+        {
+            SDL_GPUVertexAttribute vertexAttribute{};
+            vertexAttribute.format = attr.format;
+            vertexAttribute.offset = attr.offset;
+            vertexAttribute.buffer_slot = 0;
+            vertexAttribute.location = i++;
+            vertexAttributes.push_back(vertexAttribute);
+        }
+        return vertexAttributes;
+    }
 }

@@ -77,24 +77,11 @@ RectElement::RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow)
 
     pipelineInfo.vertex_input_state.num_vertex_buffers = 1;
     pipelineInfo.vertex_input_state.vertex_buffer_descriptions = vertexBufferDesctiptions;
-
-    // describe the vertex attribute
-    SDL_GPUVertexAttribute vertexAttributes[2];
-
-    // a_position
-    vertexAttributes[0].buffer_slot = 0;                             // fetch data from the buffer at slot 0
-    vertexAttributes[0].location = 0;                                // layout (location = 0) in shader
-    vertexAttributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3; // vec3
-    vertexAttributes[0].offset = 0;                                  // start from the first byte from current buffer position
-
-    // a_color
-    vertexAttributes[1].buffer_slot = 0;                             // use buffer at slot 0
-    vertexAttributes[1].location = 1;                                // layout (location = 1) in shader
-    vertexAttributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4; // vec4
-    vertexAttributes[1].offset = sizeof(float) * 3;                  // 4th float from current buffer position
-
-    pipelineInfo.vertex_input_state.num_vertex_attributes = 2;
-    pipelineInfo.vertex_input_state.vertex_attributes = vertexAttributes;
+    
+    auto vertexAttributes = createVertexAttribute({{SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, 0},
+                                                    {SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, sizeof(float) * 3}});
+    pipelineInfo.vertex_input_state.num_vertex_attributes = vertexAttributes.size();
+    pipelineInfo.vertex_input_state.vertex_attributes = vertexAttributes.data();
 
     // describe the color target
     SDL_GPUColorTargetDescription colorTargetDescriptions = createColorTargetDescription(device, window);

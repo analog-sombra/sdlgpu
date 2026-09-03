@@ -5,6 +5,7 @@
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_video.h>
+#include <vector>
 
 namespace Engine
 {
@@ -57,6 +58,14 @@ namespace Engine
         SDL_Window *window);
 
     SDL_GPUVertexBufferDescription createVertexBufferDescription(Uint32 size);
+
+    struct CreateVertexAttribute
+    {
+        SDL_GPUVertexElementFormat format; /**< The size and type of the attribute data. */
+        Uint32 offset;
+    };
+
+    std::vector<SDL_GPUVertexAttribute> createVertexAttribute(const std::vector<CreateVertexAttribute> &attributes);
 
 }
 #endif // __GPU_UTILS__
