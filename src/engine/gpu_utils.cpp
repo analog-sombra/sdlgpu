@@ -121,6 +121,18 @@ namespace Engine
         pipelineInfo.target_info.num_color_targets = 1;
         pipelineInfo.target_info.color_target_descriptions = &colorTargetDescription;
 
+        SDL_GPUDepthStencilState depthState{};
+
+        depthState.enable_depth_test = true;
+        depthState.enable_depth_write = true;
+        depthState.compare_op = SDL_GPU_COMPAREOP_LESS;
+
+        
+        pipelineInfo.depth_stencil_state = depthState;
+
+        // Also need to set depth format:
+        pipelineInfo.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+
         return SDL_CreateGPUGraphicsPipeline(device, &pipelineInfo);
     }
 }

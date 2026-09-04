@@ -42,8 +42,8 @@ namespace Engine
     class RectElement
     {
     private:
-        SDL_GPUDevice *device; // Not owned - borrowed from Game
-        SDL_Window *window;    // Not owned - borrowed from Game
+        SDL_GPUDevice *device;
+        SDL_Window *window;
 
         glm::mat4 model;
         glm::mat4 view;
@@ -54,12 +54,17 @@ namespace Engine
         std::unique_ptr<SDL_GPUBuffer, GPUBufferDeleter> indexBuffer;
         std::unique_ptr<SDL_GPUGraphicsPipeline, GraphicsPipelineDeleter> graphicsPipeline;
 
+        glm::vec3 cameraPos;
+        glm::vec3 cameraFront;
+        glm::vec3 cameraUp;
+
     public:
-        RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow);
+        RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *window);
         ~RectElement();
 
         void Update();
         void Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *commandBuffer);
+        void HandleEvents(const SDL_Event &event);
     };
 }
 

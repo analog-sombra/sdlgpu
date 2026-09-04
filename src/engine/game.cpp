@@ -23,56 +23,75 @@ Game::Game(std::string title)
     device.reset(SDL_CreateGPUDevice(SDL_ShaderCross_GetSPIRVShaderFormats(), true, NULL));
     SDL_ClaimWindowForGPUDevice(device.get(), window.get());
 
-    // Initialize RectElement with device and window pointers
-    // rectElement.Initialize(device.get(), window.get());
-    rectElement = std::make_unique<RectElement>(device.get(), window.get());
+    // create depth texture info
+    SDL_GPUTextureCreateInfo depthTextureInfo{};
+    depthTextureInfo.type = SDL_GPU_TEXTURETYPE_2D;
+    depthTextureInfo.format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+    depthTextureInfo.width = 1280;
+    depthTextureInfo.height = 720;
+    depthTextureInfo.layer_count_or_depth = 1;
+    depthTextureInfo.num_levels = 1;
+    depthTextureInfo.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
+    depthTextureInfo.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    SDL_GPUTexture *depthTexture = SDL_CreateGPUTexture(device.get(), &depthTextureInfo);
+    this->depthTexture = std::unique_ptr<SDL_GPUTexture, SDLGPUTextureDeleter>(depthTexture, SDLGPUTextureDeleter{device.get()});
 
-    spdlog::info("GPU driver: {}", SDL_GetGPUDeviceDriver(device.get()));
+    // // Initialize RectElement with device and window pointers
+    // // rectElement.Initialize(device.get(), window.get());
+    // rectElement = std::make_unique<RectElement>(device.get(), window.get());
+    seaneManager = std::make_shared<SeaneManager>(device.get(), window.get());
 
-    bool issup = SDL_WindowSupportsGPUPresentMode(
-        device.get(),
-        window.get(),
-        SDL_GPU_PRESENTMODE_IMMEDIATE);
-    if (issup)
-    {
-        spdlog::info("Immediate present mode is supported");
-    }
-    else
-    {
-        spdlog::warn("Immediate present mode is not supported");
-    }
+    // Initialize all game seanes using GameSetup
+    // NOTE: All seane setup logic is now in game/setup/game_setup.cpp
+    // To add new seanes, modify GameSetup::InitializeSeanes() in game/setup/
+    GameSetup::InitializeSeanes(seaneManager, device.get(), window.get());
 
-    if (SDL_WindowSupportsGPUPresentMode(
-            device.get(),
-            window.get(),
-            SDL_GPU_PRESENTMODE_IMMEDIATE))
-    {
-        SDL_SetGPUSwapchainParameters(
-            device.get(),
-            window.get(),
-            SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
-            SDL_GPU_PRESENTMODE_IMMEDIATE);
-    }
-    else
-    {
-        spdlog::info("Immediate present mode is not supported");
-    }
+    // spdlog::info("GPU driver: {}", SDL_GetGPUDeviceDriver(device.get()));
 
-    SDL_PropertiesID props = SDL_GetGPUDeviceProperties(device.get());
+    // bool issup = SDL_WindowSupportsGPUPresentMode(
+    //     device.get(),
+    //     window.get(),
+    //     SDL_GPU_PRESENTMODE_IMMEDIATE);
+    // if (issup)
+    // {
+    //     spdlog::info("Immediate present mode is supported");
+    // }
+    // else
+    // {
+    //     spdlog::warn("Immediate present mode is not supported");
+    // }
 
-    const char *gpuName = SDL_GetStringProperty(
-        props,
-        SDL_PROP_GPU_DEVICE_NAME_STRING,
-        "Unknown");
+    // if (SDL_WindowSupportsGPUPresentMode(
+    //         device.get(),
+    //         window.get(),
+    //         SDL_GPU_PRESENTMODE_IMMEDIATE))
+    // {
+    //     SDL_SetGPUSwapchainParameters(
+    //         device.get(),
+    //         window.get(),
+    //         SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
+    //         SDL_GPU_PRESENTMODE_IMMEDIATE);
+    // }
+    // else
+    // {
+    //     spdlog::info("Immediate present mode is not supported");
+    // }
 
-    const char *driverName = SDL_GetStringProperty(
-        props,
-        SDL_PROP_GPU_DEVICE_DRIVER_NAME_STRING,
-        "Unknown");
+    // SDL_PropertiesID props = SDL_GetGPUDeviceProperties(device.get());
 
-    spdlog::info("GPU: {}", gpuName);
-    spdlog::info("Driver: {}", driverName);
-    spdlog::info("Backend: {}", SDL_GetGPUDeviceDriver(device.get()));
+    // const char *gpuName = SDL_GetStringProperty(
+    //     props,
+    //     SDL_PROP_GPU_DEVICE_NAME_STRING,
+    //     "Unknown");
+
+    // const char *driverName = SDL_GetStringProperty(
+    //     props,
+    //     SDL_PROP_GPU_DEVICE_DRIVER_NAME_STRING,
+    //     "Unknown");
+
+    // spdlog::info("GPU: {}", gpuName);
+    // spdlog::info("Driver: {}", driverName);
+    // spdlog::info("Backend: {}", SDL_GetGPUDeviceDriver(device.get()));
 }
 
 Game::~Game()
@@ -83,6 +102,7 @@ Game::~Game()
     if (device && window)
         SDL_ReleaseWindowFromGPUDevice(device.get(), window.get());
 
+    seaneManager.reset();
     device.reset();
     window.reset();
 
@@ -93,9 +113,19 @@ void Game::Run()
 {
     Uint64 fps = 0;
     Uint64 fpsTimer = SDL_GetTicks();
+    lastFrameTime = SDL_GetTicks();
 
     while (running)
     {
+
+        Uint64 currentFrameTime = SDL_GetTicks();
+        deltaTime = (currentFrameTime - lastFrameTime) / 1000.0f; // Convert to seconds
+        lastFrameTime = currentFrameTime;
+
+        // Cap deltaTime to prevent large jumps (e.g., if paused/debugged)
+        if (deltaTime > 0.05f) // Max 50ms per frame
+            deltaTime = 0.05f;
+
         HandleEvents();
         Update();
         Render();
@@ -125,10 +155,17 @@ void Game::Render()
     colorTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
     colorTargetInfo.texture = swapchainTexture;
 
-    // begin a render pass
-    SDL_GPURenderPass *renderPass = SDL_BeginGPURenderPass(commandBuffer, &colorTargetInfo, 1, NULL);
+    // create the depth stencil target info
+    SDL_GPUDepthStencilTargetInfo depthTargetInfo{};
+    depthTargetInfo.texture = depthTexture.get();
+    depthTargetInfo.clear_depth = 1.0f;
+    depthTargetInfo.load_op = SDL_GPU_LOADOP_CLEAR;
+    depthTargetInfo.store_op = SDL_GPU_STOREOP_STORE;
 
-    rectElement.get()->Render(renderPass, commandBuffer);
+    // begin a render pass
+    SDL_GPURenderPass *renderPass = SDL_BeginGPURenderPass(commandBuffer, &colorTargetInfo, 1, &depthTargetInfo);
+
+    seaneManager->Render(renderPass, commandBuffer);
 
     // end the render pass
     SDL_EndGPURenderPass(renderPass);
@@ -139,8 +176,7 @@ void Game::Render()
 
 void Game::Update()
 {
-    rectElement.get()->Update();
-    // update game state here
+    seaneManager->Update(deltaTime);
 }
 
 void Game::HandleEvents()
@@ -148,6 +184,7 @@ void Game::HandleEvents()
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
+        seaneManager->HandleEvents(event);
         if (event.type == SDL_EVENT_QUIT)
             running = false;
 
