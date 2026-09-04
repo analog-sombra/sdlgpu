@@ -325,10 +325,6 @@ RectElement::RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *window)
     SDL_ReleaseGPUShader(device, fragmentShader);
     SDL_ReleaseGPUTransferBuffer(device, vertexTransferBuffer);
     // SDL_ReleaseGPUTransferBuffer(device, indexTransferBuffer);
-
-    this->cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
-    this->cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-    this->cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 }
 
 RectElement::~RectElement()
@@ -340,10 +336,16 @@ RectElement::~RectElement()
 
 void RectElement::Update()
 {
-
     float aspect = 1280.0f / 720.0f; // width / height
     // projection = glm::ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
-    projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+    
+    // Use camera's zoom for FOV if camera is available
+    float fov = 45.0f;  // Default FOV
+    if (camera)
+    {
+        fov = camera->GetZoom();
+    }
+    projection = glm::perspective(glm::radians(fov), aspect, 0.1f, 100.0f);
 
     // view = glm::mat4(1.0f);
     // // note that we're translating the scene in the reverse direction of where we want to move
@@ -360,34 +362,8 @@ void RectElement::Update()
 
 void RectElement::HandleEvents(const SDL_Event &event)
 {
-
-    view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-
-    const float cameraSpeed = 0.05f; // adjust accordingly
-    if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_W)
-    {
-        SDL_Log("W key pressed");
-
-        cameraPos += cameraSpeed * cameraFront;
-        view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-    }
-    if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_S)
-    {
-
-        cameraPos -= cameraSpeed * cameraFront;
-        view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-    }
-    if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_A)
-    {
-
-        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
-        view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-    }
-    if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_D)
-    {
-        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
-        view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-    }
+    // Camera input is now handled by the Seane class
+    // This method is kept for compatibility but does nothing
 }
 void RectElement::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *commandBuffer)
 {
@@ -412,7 +388,15 @@ void RectElement::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *co
     TransformUniform uniformData;
     uniformData.model = model;
     uniformData.projection = projection;
-    uniformData.view = view;
+    // Get view matrix from camera if available
+    if (camera)
+    {
+        uniformData.view = camera->GetViewMatrix();
+    }
+    else
+    {
+        uniformData.view = view;
+    }
 
     // Push both matrices in ONE call to match the shader's uniform block
     SDL_PushGPUVertexUniformData(

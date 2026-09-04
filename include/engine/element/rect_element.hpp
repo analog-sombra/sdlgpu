@@ -8,6 +8,7 @@
 #include <SDL3/SDL_video.h>
 #include "shader.hpp"
 #include "engine/gpu_utils.hpp"
+#include "engine/camera.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -54,9 +55,7 @@ namespace Engine
         std::unique_ptr<SDL_GPUBuffer, GPUBufferDeleter> indexBuffer;
         std::unique_ptr<SDL_GPUGraphicsPipeline, GraphicsPipelineDeleter> graphicsPipeline;
 
-        glm::vec3 cameraPos;
-        glm::vec3 cameraFront;
-        glm::vec3 cameraUp;
+        Camera *camera = nullptr;  // Non-owned - borrowed from Seane
 
     public:
         RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *window);
@@ -65,6 +64,8 @@ namespace Engine
         void Update();
         void Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *commandBuffer);
         void HandleEvents(const SDL_Event &event);
+
+        void SetCamera(Camera *cam) { camera = cam; }
     };
 }
 

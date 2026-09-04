@@ -8,8 +8,14 @@ TestSeane::TestSeane(SDL_GPUDevice *device, SDL_Window *window) : Seane(device, 
 
 void TestSeane::Initialize()
 {
+    if (!camera)
+        camera = std::make_unique<Camera>();
+
     if (!rectElement)
+    {
         rectElement = std::make_unique<RectElement>(GetDevice(), GetWindow());
+        rectElement->SetCamera(camera.get());  // Pass camera to RectElement
+    }
 }
 
 TestSeane::~TestSeane()
@@ -30,6 +36,15 @@ void TestSeane::Update(float deltaTime)
 
 void TestSeane::HandleEvents(SDL_Event event)
 {
-    if (rectElement)
-        rectElement->HandleEvents(event);
+    // Pass input to camera to control the cube
+    if (camera)
+    {
+        camera->HandleInput(event);
+
+        // Handle mouse movement for camera look
+        if (event.type == SDL_EVENT_MOUSE_MOTION)
+        {
+            camera->ProcessMouseMovement(event.motion.x, event.motion.y);
+        }
+    }
 }
