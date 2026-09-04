@@ -16,12 +16,19 @@ namespace Engine
 
     SDL_GPUTransferBuffer *createGpuTransferBufferInfo(
         SDL_GPUDevice *device,
+        const void *data,
         Uint32 size)
     {
         SDL_GPUTransferBufferCreateInfo transferBufferInfo{};
         transferBufferInfo.size = size;
         transferBufferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-        return SDL_CreateGPUTransferBuffer(device, &transferBufferInfo);
+        SDL_GPUTransferBuffer *transferBuffer = SDL_CreateGPUTransferBuffer(device, &transferBufferInfo);
+
+        // upload vertex data
+        void *mapped = SDL_MapGPUTransferBuffer(device, transferBuffer, false);
+        SDL_memcpy(mapped, data, size);
+        SDL_UnmapGPUTransferBuffer(device, transferBuffer);
+        return transferBuffer;
     }
 
     void uploadBufferData(
@@ -86,5 +93,34 @@ namespace Engine
             vertexAttributes.push_back(vertexAttribute);
         }
         return vertexAttributes;
+    }
+
+    SDL_GPUGraphicsPipeline *createGraphicsPipeline(
+        SDL_GPUDevice *device,
+        SDL_GPUShader *vertexShader,
+        SDL_GPUShader *fragmentShader,
+        const std::vector<SDL_GPUVertexBufferDescription> &vertexBufferDescriptions,
+        const std::vector<SDL_GPUVertexAttribute> &vertexAttributes,
+        SDL_GPUColorTargetDescription colorTargetDescription)
+    {
+        SDL_GPUGraphicsPipelineCreateInfo pipelineInfo{};
+
+        // bind shaders
+        pipelineInfo.vertex_shader = vertexShader;
+        pipelineInfo.fragment_shader = fragmentShader;
+
+        // draw triangles
+        pipelineInfo.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+
+        pipelineInfo.vertex_input_state.num_vertex_buffers = vertexBufferDescriptions.size();
+        pipelineInfo.vertex_input_state.vertex_buffer_descriptions = vertexBufferDescriptions.data();
+
+        pipelineInfo.vertex_input_state.num_vertex_attributes = vertexAttributes.size();
+        pipelineInfo.vertex_input_state.vertex_attributes = vertexAttributes.data();
+
+        pipelineInfo.target_info.num_color_targets = 1;
+        pipelineInfo.target_info.color_target_descriptions = &colorTargetDescription;
+
+        return SDL_CreateGPUGraphicsPipeline(device, &pipelineInfo);
     }
 }

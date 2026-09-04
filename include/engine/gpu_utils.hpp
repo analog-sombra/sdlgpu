@@ -45,7 +45,7 @@ namespace Engine
         SDL_GPUDevice *device, SDL_GPUBufferUsageFlags type, Uint32 size);
 
     SDL_GPUTransferBuffer *createGpuTransferBufferInfo(
-        SDL_GPUDevice *device, Uint32 size);
+        SDL_GPUDevice *device, const void *data, Uint32 size);
 
     void uploadBufferData(
         SDL_GPUCopyPass *copyPass,
@@ -66,6 +66,14 @@ namespace Engine
     };
 
     std::vector<SDL_GPUVertexAttribute> createVertexAttribute(const std::vector<CreateVertexAttribute> &attributes);
+
+    SDL_GPUGraphicsPipeline *createGraphicsPipeline(
+        SDL_GPUDevice *device,
+        SDL_GPUShader *vertexShader,
+        SDL_GPUShader *fragmentShader,
+        const std::vector<SDL_GPUVertexBufferDescription> &vertexBufferDescriptions,
+        const std::vector<SDL_GPUVertexAttribute> &vertexAttributes,
+        SDL_GPUColorTargetDescription colorTargetDescription);
 
 }
 #endif // __GPU_UTILS__

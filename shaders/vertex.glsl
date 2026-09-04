@@ -7,12 +7,13 @@ layout (location = 0) out vec4 v_color;
 layout(set = 1, binding = 0) uniform Transform
 {
     mat4 model;
+    mat4 view;
     mat4 projection;
 };
 
 void main()
 {
-    gl_Position = projection * model * vec4(a_position, 1.0f);
+    gl_Position = projection * view * model * vec4(a_position, 1.0f);
     v_color = a_color;
     
 }

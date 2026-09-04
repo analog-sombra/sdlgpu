@@ -25,7 +25,7 @@ Game::Game(std::string title)
 
     // Initialize RectElement with device and window pointers
     // rectElement.Initialize(device.get(), window.get());
-    imageElement = std::make_unique<ImageElement>(device.get(), window.get());
+    rectElement = std::make_unique<RectElement>(device.get(), window.get());
 
     spdlog::info("GPU driver: {}", SDL_GetGPUDeviceDriver(device.get()));
 
@@ -128,7 +128,7 @@ void Game::Render()
     // begin a render pass
     SDL_GPURenderPass *renderPass = SDL_BeginGPURenderPass(commandBuffer, &colorTargetInfo, 1, NULL);
 
-    imageElement.get()->Render(renderPass, commandBuffer);
+    rectElement.get()->Render(renderPass, commandBuffer);
 
     // end the render pass
     SDL_EndGPURenderPass(renderPass);
@@ -139,7 +139,7 @@ void Game::Render()
 
 void Game::Update()
 {
-    imageElement.get()->Update();
+    rectElement.get()->Update();
     // update game state here
 }
 

@@ -12,8 +12,8 @@
 #include <fmt/core.h>
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
-// #include "engine/element/rect_element.hpp"
-#include "engine/element/image_element.hpp"
+#include "engine/element/rect_element.hpp"
+// #include "engine/element/image_element.hpp"
 
 #include "const.hpp"
 
@@ -47,7 +47,7 @@ namespace Engine
 
         bool running = true;
         bool fullscreen = false;
-        std::unique_ptr<ImageElement> imageElement;
+        std::unique_ptr<RectElement> rectElement;
 
     public:
         Game(std::string title);

@@ -19,6 +19,7 @@ RectElement::RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow)
 
     TransformUniform transformData;
     transformData.model = model;
+    transformData.view = view;
     transformData.projection = projection;
 
     // create the vertex buffer
@@ -30,31 +31,18 @@ RectElement::RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow)
     indexBuffer = std::unique_ptr<SDL_GPUBuffer, GPUBufferDeleter>(ibuf, {device});
 
     // create transfer buffers to upload to GPU buffers
-    auto vxbuf = createGpuTransferBufferInfo(device, sizeof(vertices));
-    vertexTransferBuffer = std::unique_ptr<SDL_GPUTransferBuffer, GPUTransferBufferDeleter>(vxbuf, {device});
-
-    auto ixbuf = createGpuTransferBufferInfo(device, sizeof(indices));
-    indexTransferBuffer = std::unique_ptr<SDL_GPUTransferBuffer, GPUTransferBufferDeleter>(ixbuf, {device});
-
-    // upload vertex data
-    Vertex *vertexData = (Vertex *)SDL_MapGPUTransferBuffer(device, vertexTransferBuffer.get(), false);
-    SDL_memcpy(vertexData, vertices, sizeof(vertices));
-    SDL_UnmapGPUTransferBuffer(device, vertexTransferBuffer.get());
-
-    // upload index data
-    uint32_t *indexData = (uint32_t *)SDL_MapGPUTransferBuffer(device, indexTransferBuffer.get(), false);
-    SDL_memcpy(indexData, indices, sizeof(indices));
-    SDL_UnmapGPUTransferBuffer(device, indexTransferBuffer.get());
+    SDL_GPUTransferBuffer *vertexTransferBuffer = createGpuTransferBufferInfo(device, vertices, sizeof(vertices));
+    SDL_GPUTransferBuffer *indexTransferBuffer = createGpuTransferBufferInfo(device, indices, sizeof(indices));
 
     // start a copy pass
     SDL_GPUCommandBuffer *commandBuffer = SDL_AcquireGPUCommandBuffer(device);
     SDL_GPUCopyPass *copyPass = SDL_BeginGPUCopyPass(commandBuffer);
 
     // upload vertex buffer
-    uploadBufferData(copyPass, vertexBuffer.get(), vertexTransferBuffer.get(), sizeof(vertices));
+    uploadBufferData(copyPass, vertexBuffer.get(), vertexTransferBuffer, sizeof(vertices));
 
     // upload index buffer
-    uploadBufferData(copyPass, indexBuffer.get(), indexTransferBuffer.get(), sizeof(indices));
+    uploadBufferData(copyPass, indexBuffer.get(), indexTransferBuffer, sizeof(indices));
 
     // end the copy pass
     SDL_EndGPUCopyPass(copyPass);
@@ -63,68 +51,44 @@ RectElement::RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *sdlWindow)
     SDL_GPUShader *vertexShader = CreateShader(device, VERTEX_SHADER, "shaders/vertex.spv");
     SDL_GPUShader *fragmentShader = CreateShader(device, FRAGMENT_SHADER, "shaders/fragment.spv");
 
-    SDL_GPUGraphicsPipelineCreateInfo pipelineInfo{};
-
-    // bind shaders
-    pipelineInfo.vertex_shader = vertexShader;
-    pipelineInfo.fragment_shader = fragmentShader;
-
-    // draw triangles
-    pipelineInfo.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
-
     // describe the vertex buffers
-    SDL_GPUVertexBufferDescription vertexBufferDesctiptions[1] = {createVertexBufferDescription(sizeof(Vertex))};
+    std::vector<SDL_GPUVertexBufferDescription> vertexBufferDescriptions = {createVertexBufferDescription(sizeof(Vertex))};
 
-    pipelineInfo.vertex_input_state.num_vertex_buffers = 1;
-    pipelineInfo.vertex_input_state.vertex_buffer_descriptions = vertexBufferDesctiptions;
-    
-    auto vertexAttributes = createVertexAttribute({{SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, 0},
-                                                    {SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, sizeof(float) * 3}});
-    pipelineInfo.vertex_input_state.num_vertex_attributes = vertexAttributes.size();
-    pipelineInfo.vertex_input_state.vertex_attributes = vertexAttributes.data();
+    std::vector<SDL_GPUVertexAttribute> vertexAttributes = createVertexAttribute({{SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, 0},
+                                                                                  {SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4, sizeof(float) * 3}});
 
     // describe the color target
     SDL_GPUColorTargetDescription colorTargetDescriptions = createColorTargetDescription(device, window);
 
-    pipelineInfo.target_info.num_color_targets = 1;
-    pipelineInfo.target_info.color_target_descriptions = &colorTargetDescriptions;
-
     // create the pipeline
-    auto pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipelineInfo);
+    auto pipeline = createGraphicsPipeline(device, vertexShader, fragmentShader, vertexBufferDescriptions, vertexAttributes, colorTargetDescriptions);
     graphicsPipeline = std::unique_ptr<SDL_GPUGraphicsPipeline, GraphicsPipelineDeleter>(pipeline, {device});
-    // we don't need to store the shaders after creating the pipeline
     SDL_ReleaseGPUShader(device, vertexShader);
     SDL_ReleaseGPUShader(device, fragmentShader);
+    SDL_ReleaseGPUTransferBuffer(device, vertexTransferBuffer);
+    SDL_ReleaseGPUTransferBuffer(device, indexTransferBuffer);
 }
 
 RectElement::~RectElement()
 {
     graphicsPipeline.reset();
-    indexTransferBuffer.reset();
-    vertexTransferBuffer.reset();
     indexBuffer.reset();
     vertexBuffer.reset();
 }
 
 void RectElement::Update()
 {
-    // rotate the rectangle over time
-    transform.rotation.y += 0.05f;
-    transform.rotation.x += 0.05f;
-    transform.rotation.z += 0.05f;
-
-    // recalculate the model matrix based on updated transform
-    model = glm::mat4(1.0f);
-    model = glm::translate(model, transform.position);
-    model = glm::translate(model, glm::vec3(0.0f, 0.0f, -3.0f));
-    model = glm::rotate(model, glm::radians(transform.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-    model = glm::rotate(model, glm::radians(transform.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-    model = glm::rotate(model, glm::radians(transform.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-    model = glm::scale(model, transform.scale);
 
     float aspect = 1280.0f / 720.0f; // width / height
     // projection = glm::ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
     projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+
+    view = glm::mat4(1.0f);
+    // note that we're translating the scene in the reverse direction of where we want to move
+    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+
+    model = glm::mat4(1.0f);
+    model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 }
 
 void RectElement::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *commandBuffer)
@@ -150,6 +114,7 @@ void RectElement::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *co
     TransformUniform uniformData;
     uniformData.model = model;
     uniformData.projection = projection;
+    uniformData.view = view;
 
     // Push both matrices in ONE call to match the shader's uniform block
     SDL_PushGPUVertexUniformData(
@@ -161,5 +126,3 @@ void RectElement::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *co
     // issue an indexed draw call (6 indices = 2 triangles for a rectangle)
     SDL_DrawGPUIndexedPrimitives(renderPass, 6, 1, 0, 0, 0);
 }
-
-// 225

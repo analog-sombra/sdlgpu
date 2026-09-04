@@ -17,21 +17,27 @@ namespace Engine
     struct TransformUniform
     {
         glm::mat4 model;
+        glm::mat4 view;
         glm::mat4 projection;
     };
-
-    struct Transform
-    {
-        glm::vec3 position{0.0f, 0.0f, 0.0f};
-        glm::vec3 rotation{0.0f, 0.0f, 0.0f};
-        glm::vec3 scale{1.0f, 1.0f, 1.0f};
-    };
-
     struct Vertex
     {
         float x, y, z;    // vec3 position
         float r, g, b, a; // vec4 color
     };
+
+    // struct Transform
+    // {
+    //     glm::vec3 position{0.0f, 0.0f, 0.0f};
+    //     glm::vec3 rotation{0.0f, 0.0f, 0.0f};
+    //     glm::vec3 scale{1.0f, 1.0f, 1.0f};
+    // };
+
+    // struct Vertex
+    // {
+    //     float x, y, z;    // vec3 position
+    //     float r, g, b, a; // vec4 color
+    // };
 
     class RectElement
     {
@@ -40,13 +46,12 @@ namespace Engine
         SDL_Window *window;    // Not owned - borrowed from Game
 
         glm::mat4 model;
+        glm::mat4 view;
         glm::mat4 projection;
-        Transform transform;
+        // Transform transform;
 
         std::unique_ptr<SDL_GPUBuffer, GPUBufferDeleter> vertexBuffer;
         std::unique_ptr<SDL_GPUBuffer, GPUBufferDeleter> indexBuffer;
-        std::unique_ptr<SDL_GPUTransferBuffer, GPUTransferBufferDeleter> vertexTransferBuffer;
-        std::unique_ptr<SDL_GPUTransferBuffer, GPUTransferBufferDeleter> indexTransferBuffer;
         std::unique_ptr<SDL_GPUGraphicsPipeline, GraphicsPipelineDeleter> graphicsPipeline;
 
     public:
