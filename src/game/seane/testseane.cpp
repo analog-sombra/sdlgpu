@@ -1,5 +1,6 @@
 #include "game/seane/test.hpp"
 
+
 using namespace Engine;
 TestSeane::TestSeane(SDL_GPUDevice *device, SDL_Window *window) : Seane(device, window)
 {
@@ -38,7 +39,9 @@ void TestSeane::Update(float deltaTime)
         if (rectElement)
         {
             rectElement->setViewMatrix(camera->GetViewMatrix());
-            // rotate the rectangle element each second
+            // rotate the rectangle element each second using sdl ticks
+            float angle = SDL_GetTicks() / 1000.0f; // Get time
+            rectElement->setModelMatrix(glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0.0f, 1.0f, 0.0f)));
             rectElement->Update();
         }
     }

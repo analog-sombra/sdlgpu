@@ -349,8 +349,8 @@ void RectElement::Update()
 
     // view = glm::lookAt(glm::vec3(camX, 0.0, camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
 
-    model = glm::mat4(1.0f);
-    model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(0.1f, 0.0f, 0.0f));
+    // model = glm::mat4(1.0f);
+    // model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(0.1f, 0.0f, 0.0f));
     // rotate every fram
     // model = glm::rotate(model,glm::translate, glm::vec3(0.0f, 1.0f, 0.0f));
     // model = glm::translate(view, glm::vec3(0.0f, 0.0f, 0.0f));

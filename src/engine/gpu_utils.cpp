@@ -127,11 +127,13 @@ namespace Engine
         depthState.enable_depth_write = true;
         depthState.compare_op = SDL_GPU_COMPAREOP_LESS;
 
-        
-        pipelineInfo.depth_stencil_state = depthState;
+                pipelineInfo.depth_stencil_state = depthState;
 
         // Also need to set depth format:
         pipelineInfo.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D32_FLOAT;
+
+        //anti aliasing
+        pipelineInfo.multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_4;
 
         return SDL_CreateGPUGraphicsPipeline(device, &pipelineInfo);
     }

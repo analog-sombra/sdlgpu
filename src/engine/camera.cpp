@@ -26,6 +26,14 @@ void Camera::HandleInput(const SDL_Event &event)
         ProcessMouseScroll(static_cast<float>(event.wheel.y));
     }
 
+    // Reset mouse tracking when right-click starts
+    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT)
+    {
+        firstMouse = true;
+        lastX = event.button.x;
+        lastY = event.button.y;
+    }
+
     // Handle mouse movement
     if (event.type == SDL_EVENT_MOUSE_MOTION)
     {
