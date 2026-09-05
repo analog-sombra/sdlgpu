@@ -338,13 +338,9 @@ void RectElement::Update()
 {
     float aspect = 1280.0f / 720.0f; // width / height
     // projection = glm::ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
-    
+
     // Use camera's zoom for FOV if camera is available
-    float fov = 45.0f;  // Default FOV
-    if (camera)
-    {
-        fov = camera->GetZoom();
-    }
+    float fov = 45.0f; // Default FOV
     projection = glm::perspective(glm::radians(fov), aspect, 0.1f, 100.0f);
 
     // view = glm::mat4(1.0f);
@@ -388,15 +384,7 @@ void RectElement::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *co
     TransformUniform uniformData;
     uniformData.model = model;
     uniformData.projection = projection;
-    // Get view matrix from camera if available
-    if (camera)
-    {
-        uniformData.view = camera->GetViewMatrix();
-    }
-    else
-    {
-        uniformData.view = view;
-    }
+    uniformData.view = view;
 
     // Push both matrices in ONE call to match the shader's uniform block
     SDL_PushGPUVertexUniformData(

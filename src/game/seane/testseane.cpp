@@ -14,7 +14,7 @@ void TestSeane::Initialize()
     if (!rectElement)
     {
         rectElement = std::make_unique<RectElement>(GetDevice(), GetWindow());
-        rectElement->SetCamera(camera.get());  // Pass camera to RectElement
+        rectElement->setViewMatrix(camera->GetViewMatrix());
     }
 }
 
@@ -30,12 +30,18 @@ void TestSeane::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *comm
 
 void TestSeane::Update(float deltaTime)
 {
-    // Update continuous camera movement (WASD)
     if (camera)
+    {
         camera->UpdateMovement();
 
-    if (rectElement)
-        rectElement->Update();
+        // Update all elements with the camera's current view matrix
+        if (rectElement)
+        {
+            rectElement->setViewMatrix(camera->GetViewMatrix());
+            // rotate the rectangle element each second
+            rectElement->Update();
+        }
+    }
 }
 
 void TestSeane::HandleEvents(SDL_Event event)
@@ -44,11 +50,5 @@ void TestSeane::HandleEvents(SDL_Event event)
     if (camera)
     {
         camera->HandleInput(event);
-
-        // Handle mouse movement for camera look
-        // if (event.type == SDL_EVENT_MOUSE_MOTION)
-        // {
-        //     camera->ProcessMouseMovement(event.motion.x, event.motion.y);
-        // }
     }
 }

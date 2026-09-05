@@ -27,19 +27,6 @@ namespace Engine
         float r, g, b, a; // vec4 color
     };
 
-    // struct Transform
-    // {
-    //     glm::vec3 position{0.0f, 0.0f, 0.0f};
-    //     glm::vec3 rotation{0.0f, 0.0f, 0.0f};
-    //     glm::vec3 scale{1.0f, 1.0f, 1.0f};
-    // };
-
-    // struct Vertex
-    // {
-    //     float x, y, z;    // vec3 position
-    //     float r, g, b, a; // vec4 color
-    // };
-
     class RectElement
     {
     private:
@@ -49,13 +36,10 @@ namespace Engine
         glm::mat4 model;
         glm::mat4 view;
         glm::mat4 projection;
-        // Transform transform;
 
         std::unique_ptr<SDL_GPUBuffer, GPUBufferDeleter> vertexBuffer;
         std::unique_ptr<SDL_GPUBuffer, GPUBufferDeleter> indexBuffer;
         std::unique_ptr<SDL_GPUGraphicsPipeline, GraphicsPipelineDeleter> graphicsPipeline;
-
-        Camera *camera = nullptr;  // Non-owned - borrowed from Seane
 
     public:
         RectElement(SDL_GPUDevice *gpuDevice, SDL_Window *window);
@@ -65,7 +49,10 @@ namespace Engine
         void Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *commandBuffer);
         void HandleEvents(const SDL_Event &event);
 
-        void SetCamera(Camera *cam) { camera = cam; }
+        void getModelMatrix(glm::mat4 &outModel) const { outModel = model; }
+        void getViewMatrix(glm::mat4 &outView) const { outView = view; }
+        void setModelMatrix(const glm::mat4 &inModel) { model = inModel; }
+        void setViewMatrix(const glm::mat4 &inView) { view = inView; }
     };
 }
 
