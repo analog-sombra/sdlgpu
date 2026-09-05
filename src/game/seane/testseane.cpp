@@ -30,6 +30,10 @@ void TestSeane::Render(SDL_GPURenderPass *renderPass, SDL_GPUCommandBuffer *comm
 
 void TestSeane::Update(float deltaTime)
 {
+    // Update continuous camera movement (WASD)
+    if (camera)
+        camera->UpdateMovement();
+
     if (rectElement)
         rectElement->Update();
 }
@@ -42,9 +46,9 @@ void TestSeane::HandleEvents(SDL_Event event)
         camera->HandleInput(event);
 
         // Handle mouse movement for camera look
-        if (event.type == SDL_EVENT_MOUSE_MOTION)
-        {
-            camera->ProcessMouseMovement(event.motion.x, event.motion.y);
-        }
+        // if (event.type == SDL_EVENT_MOUSE_MOTION)
+        // {
+        //     camera->ProcessMouseMovement(event.motion.x, event.motion.y);
+        // }
     }
 }

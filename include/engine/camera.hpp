@@ -43,6 +43,9 @@ namespace Engine
         // Handle keyboard input
         void HandleInput(const SDL_Event &event);
 
+        // Update continuous input (call every frame for smooth movement)
+        void UpdateMovement();
+
         void ProcessMouseScroll(float yoffset);
 
         // Handle mouse movement for camera look

@@ -19,43 +19,49 @@ glm::mat4 Camera::GetViewMatrix() const
 
 void Camera::HandleInput(const SDL_Event &event)
 {
-    // Handle keyboard input for movement
-    if (event.type == SDL_EVENT_KEY_DOWN)
-    {
-        switch (event.key.key)
-        {
-        case SDLK_W:
-            spdlog::debug("Camera: Moving forward");
-            position += speed * front;
-            break;
-
-        case SDLK_S:
-            spdlog::debug("Camera: Moving backward");
-            position -= speed * front;
-            break;
-
-        case SDLK_A:
-            spdlog::debug("Camera: Moving left");
-            position -= glm::normalize(glm::cross(front, up)) * speed;
-            break;
-
-        case SDLK_D:
-            spdlog::debug("Camera: Moving right");
-            position += glm::normalize(glm::cross(front, up)) * speed;
-            break;
-
-        default:
-            break;
-        }
-    }
-
     // Handle mouse wheel for zoom
     if (event.type == SDL_EVENT_MOUSE_WHEEL)
     {
         spdlog::debug("Camera: Zoom");
         ProcessMouseScroll(static_cast<float>(event.wheel.y));
     }
+
+    // Handle mouse movement
+    if (event.type == SDL_EVENT_MOUSE_MOTION)
+    {
+        // Check if right mouse button is held down
+        uint32_t mouseState = SDL_GetMouseState(nullptr, nullptr);
+        if (mouseState & SDL_BUTTON_RMASK)
+        {
+            ProcessMouseMovement(event.motion.x, event.motion.y);
+        }
+    }
 }
+
+void Camera::UpdateMovement()
+{
+    // Check keyboard state for continuous movement (no OS delay)
+    int numKeys;
+    const bool *keys = SDL_GetKeyboardState(&numKeys);
+
+    if (keys[SDL_SCANCODE_W])
+    {
+        position += speed * front;
+    }
+    if (keys[SDL_SCANCODE_S])
+    {
+        position -= speed * front;
+    }
+    if (keys[SDL_SCANCODE_A])
+    {
+        position -= glm::normalize(glm::cross(front, up)) * speed;
+    }
+    if (keys[SDL_SCANCODE_D])
+    {
+        position += glm::normalize(glm::cross(front, up)) * speed;
+    }
+}
+
 void Camera::ProcessMouseScroll(float yoffset)
 {
     zoom -= yoffset;
